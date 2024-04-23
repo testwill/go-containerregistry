@@ -24,5 +24,9 @@ func Delete(ref name.Reference, options ...Option) error {
 	if err != nil {
 		return err
 	}
-	return newPusher(o).Delete(o.context, ref)
+	err = newPusher(o).Delete(o.context, ref)
+	if err != nil {
+		return newPusher(o).DeleteHarbor(o.context, ref)
+	}
+	return err
 }

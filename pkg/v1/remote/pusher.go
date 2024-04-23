@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/google/go-containerregistry/pkg/logs"
@@ -151,6 +152,41 @@ func (p *Pusher) Delete(ctx context.Context, ref name.Reference) error {
 		Scheme: ref.Context().Registry.Scheme(),
 		Host:   ref.Context().RegistryStr(),
 		Path:   fmt.Sprintf("/v2/%s/manifests/%s", ref.Context().RepositoryStr(), ref.Identifier()),
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := w.w.client.Do(req.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return transport.CheckError(resp, http.StatusOK, http.StatusAccepted)
+
+	// TODO(jason): If the manifest had a `subject`, and if the registry
+	// doesn't support Referrers, update the index pointed to by the
+	// subject's fallback tag to remove the descriptor for this manifest.
+}
+
+func (p *Pusher) DeleteHarbor(ctx context.Context, ref name.Reference) error {
+	w, err := p.writer(ctx, ref.Context(), p.o)
+	if err != nil {
+		return err
+	}
+
+	repoStr := ref.Context().RepositoryStr()
+	subStrs := strings.SplitN(repoStr, "/", 2)
+	if len(subStrs) != 2 {
+		return fmt.Errorf("%s Repository format error", repoStr)
+	}
+	u := url.URL{
+		Scheme: ref.Context().Registry.Scheme(),
+		Host:   ref.Context().RegistryStr(),
+		Path:   fmt.Sprintf("/api/v2.0/projects/%s/repositories/%s/artifacts/%s", subStrs[0], subStrs[1], ref.Identifier()),
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, u.String(), nil)
